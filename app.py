@@ -1,41 +1,49 @@
-import os
-import logging
-from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.orm import DeclarativeBase
-from werkzeug.middleware.proxy_fix import ProxyFix
+from flask import Flask, render_template_string, request
+import threading, requests, time
 
-# Set up logging
-logging.basicConfig(level=logging.DEBUG)
-
-class Base(DeclarativeBase):
-    pass
-
-db = SQLAlchemy(model_class=Base)
-
-# create the app
 app = Flask(__name__)
-app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-production")
-app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# configure the database, relative to the app instance folder
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "sqlite:///uptime_monitor.db")
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_recycle": 300,
-    "pool_pre_ping": True,
-}
+# Global flag to control the wake loop
+wake_running = False
 
-# initialize the app with the extension
-db.init_app(app)
+def wake_web():
+    global wake_running
+    while wake_running:
+        with open('weblist.txt', 'r') as f:
+            url = f.readline()
+            while url:
+                try:
+                    response = requests.get(url.strip())
+                    response.raise_for_status()
+                    print(f'Successfully visited your web: {url.strip()}')
+                    print(f'Status code: {response.status_code}')
+                except requests.RequestException as e:
+                    print(f'Error detected as: {e}')
+                url = f.readline()
+        time.sleep(30)
 
-with app.app_context():
-    # Import models and routes
-    import models
-    import routes
-    
-    # Create all tables
-    db.create_all()
-    
-    # Start monitoring service
-    from monitoring import start_monitoring_service
-    start_monitoring_service()
+@app.route('/')
+def index():
+    return render_template_string('''
+        <h2>Wake Web Service</h2>
+        <form action="/start" method="post">
+            <button type="submit">Start Wake</button>
+        </form>
+        <form action="/stop" method="post">
+            <button type="submit">Stop Wake</button>
+        </form>
+    ''')
+
+@app.route('/start', methods=['POST'])
+def start_wake():
+    global wake_running
+    if not wake_running:
+        wake_running = True
+        threading.Thread(target=wake_web, daemon=True).start()
+    return "Wake process started. <a href='/'>Back</a>"
+
+@app.route('/stop', methods=['POST'])
+def stop_wake():
+    global wake_running
+    wake_running = False
+    return "Wake process stopped. <a href='/'>Back</a>"
