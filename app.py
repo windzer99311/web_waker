@@ -1,15 +1,18 @@
-from flask import Flask, render_template_string
+from flask import Flask, render_template_string, jsonify
 import threading, requests, time
 from datetime import datetime
 
 app = Flask(__name__)
 
-# Fixed virtual start time
+# Virtual start time and server boot time
 virtual_start_str = "2025-06-13 00:00:00"
 virtual_start = datetime.strptime(virtual_start_str, "%Y-%m-%d %H:%M:%S")
 real_server_start = datetime.now()
 
-# Wake web function (one request per URL every 30s)
+# Store log messages
+logs = []
+
+# Wake web loop with logging
 def wake_web():
     while True:
         try:
@@ -19,12 +22,25 @@ def wake_web():
                     try:
                         response = requests.get(url)
                         response.raise_for_status()
-                        print(f'Successfully visited your web: {url}')
-                        print(f'Status code: {response.status_code}')
+                        msg1 = f"Successfully visited your web: {url}"
+                        msg2 = f"Status code: {response.status_code}"
+                        print(msg1)
+                        print(msg2)
+                        logs.append(msg1)
+                        logs.append(msg2)
                     except requests.RequestException as e:
-                        print(f'Error detected as: {e}')
+                        err = f"Error detected as: {e}"
+                        print(err)
+                        logs.append(err)
         except FileNotFoundError:
-            print("weblist.txt not found.")
+            msg = "weblist.txt not found."
+            print(msg)
+            logs.append(msg)
+
+        # Limit log size
+        if len(logs) > 100:
+            del logs[:len(logs) - 100]
+
         time.sleep(30)
 
 @app.route('/')
@@ -55,16 +71,35 @@ def index():
                         `Time running since ${{year}}-${{month}}-${{day}} ${{hour}}:${{min}}:${{sec}}`;
                 }}
 
+                function fetchLogs() {{
+                    fetch('/logs')
+                        .then(response => response.json())
+                        .then(data => {{
+                            document.getElementById("log").innerText = data.logs.join("\\n");
+                        }});
+                }}
+
                 setInterval(updateTime, 1000);
-                window.onload = updateTime;
+                setInterval(fetchLogs, 5000);
+                window.onload = function() {{
+                    updateTime();
+                    fetchLogs();
+                }};
             </script>
         </head>
         <body>
             <h2>Wake web running...</h2>
             <p id="timer">Time running since {virtual_start_str}</p>
+            <h3>Request Log</h3>
+            <pre id="log" style="background:#eee;padding:10px;border-radius:5px;height:300px;overflow:auto;"></pre>
         </body>
         </html>
     ''')
 
-# Start background wake-up thread
+# Endpoint to fetch logs
+@app.route('/logs')
+def get_logs():
+    return jsonify(logs=logs[-100:])  # send only last 100 messages
+
+# Background thread
 threading.Thread(target=wake_web, daemon=True).start()
