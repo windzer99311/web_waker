@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - Uptime Monitor{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1 class="h2 mb-3">
+            <i data-feather="settings" class="me-2"></i>
+            Monitoring Settings
+        </h1>
+        <p class="text-muted">Configure monitoring intervals and system preferences</p>
+    </div>
+</div>
+
+<!-- Settings Form -->
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i data-feather="clock" class="me-2"></i>
+                    Monitoring Interval
+                </h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('update_settings') }}" method="POST">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="check_interval" class="form-label">Check Interval (seconds)</label>
+                            <input type="number" class="form-control" id="check_interval" name="check_interval" 
+                                   value="{{ settings.check_interval }}" min="5" max="3600" required>
+                            <div class="form-text">
+                                How often to check each website (5 seconds to 1 hour)
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Current Setting</label>
+                            <div class="form-control-plaintext">
+                                <strong>{{ settings.check_interval }}</strong> seconds
+                                <br>
+                                <small class="text-muted">
+                                    {% if settings.check_interval < 60 %}
+                                        Every {{ settings.check_interval }} seconds
+                                    {% elif settings.check_interval < 3600 %}
+                                        Every {{ (settings.check_interval / 60)|round|int }} minutes
+                                    {% else %}
+                                        Every {{ (settings.check_interval / 3600)|round|int }} hour(s)
+                                    {% endif %}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="alert alert-info">
+                                <i data-feather="info" class="me-2"></i>
+                                <strong>Note:</strong> Changes will take effect on the next monitoring cycle. 
+                                Lower intervals provide more frequent updates but may use more resources.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                            <i data-feather="arrow-left" class="me-1"></i>Back to Dashboard
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i data-feather="save" class="me-1"></i>Save Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quick Settings -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i data-feather="zap" class="me-2"></i>
+                    Quick Settings
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="setInterval(10)">
+                        <i data-feather="clock" class="me-1"></i>10 seconds (Fast)
+                    </button>
+                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="setInterval(30)">
+                        <i data-feather="clock" class="me-1"></i>30 seconds (Default)
+                    </button>
+                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="setInterval(60)">
+                        <i data-feather="clock" class="me-1"></i>1 minute (Normal)
+                    </button>
+                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="setInterval(300)">
+                        <i data-feather="clock" class="me-1"></i>5 minutes (Slow)
+                    </button>
+                </div>
+                
+                <hr>
+                
+                <div class="text-center">
+                    <small class="text-muted">
+                        <i data-feather="info" class="me-1"></i>
+                        Last updated: {{ settings.updated_at.strftime('%Y-%m-%d %H:%M:%S') if settings.updated_at else 'Never' }}
+                    </small>
+                </div>
+            </div>
+        </div>
+        
+        <!-- System Info -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i data-feather="activity" class="me-2"></i>
+                    System Status
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6">
+                        <div class="border-end">
+                            <div class="h4 mb-1 text-success">
+                                <i data-feather="check-circle"></i>
+                            </div>
+                            <small class="text-muted">Monitoring Active</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="h4 mb-1 text-info">
+                            <i data-feather="server"></i>
+                        </div>
+                        <small class="text-muted">Service Running</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function setInterval(seconds) {
+        document.getElementById('check_interval').value = seconds;
+    }
+    
+    // Form validation
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.querySelector('form');
+        const intervalInput = document.getElementById('check_interval');
+        
+        form.addEventListener('submit', function(e) {
+            const value = parseInt(intervalInput.value);
+            
+            if (value < 5) {
+                e.preventDefault();
+                alert('Minimum interval is 5 seconds');
+                return false;
+            }
+            
+            if (value > 3600) {
+                e.preventDefault();
+                alert('Maximum interval is 3600 seconds (1 hour)');
+                return false;
+            }
+        });
+    });
+</script>
+{% endblock %}

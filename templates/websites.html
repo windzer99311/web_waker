@@ -1,0 +1,281 @@
+{% extends "base.html" %}
+
+{% block title %}Websites - Uptime Monitor{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1 class="h2 mb-3">
+            <i data-feather="globe" class="me-2"></i>
+            Website Management
+        </h1>
+        <p class="text-muted">Add, edit, and manage websites for monitoring</p>
+    </div>
+</div>
+
+<!-- Add Website Form -->
+<div class="row mb-4">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i data-feather="plus" class="me-2"></i>
+                    Add New Website
+                </h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('add_website') }}" method="POST">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="name" class="form-label">Website Name</label>
+                            <input type="text" class="form-control" id="name" name="name" required placeholder="My Website">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="url" class="form-label">URL</label>
+                            <input type="url" class="form-control" id="url" name="url" required placeholder="https://example.com">
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label class="form-label">&nbsp;</label>
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i data-feather="plus" class="me-1"></i>Add
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Upload Weblist -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i data-feather="upload" class="me-2"></i>
+                    Upload Weblist
+                </h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('upload_weblist') }}" method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <input type="file" class="form-control" name="file" accept=".txt" required>
+                        <div class="form-text">Upload a .txt file with one URL per line</div>
+                    </div>
+                    <button type="submit" class="btn btn-outline-primary w-100">
+                        <i data-feather="upload" class="me-1"></i>Upload
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Websites List -->
+<div class="row">
+    <div class="col">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i data-feather="list" class="me-2"></i>
+                    Monitored Websites ({{ websites|length }})
+                </h5>
+                {% if websites %}
+                <a href="{{ url_for('download_results') }}" class="btn btn-outline-secondary btn-sm">
+                    <i data-feather="download" class="me-1"></i>Export Data
+                </a>
+                {% endif %}
+            </div>
+            <div class="card-body p-0">
+                {% if websites %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Name</th>
+                                <th>URL</th>
+                                <th>Status</th>
+                                <th>Uptime</th>
+                                <th>Last Check</th>
+                                <th>Active</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for website in websites %}
+                            {% set latest = website.latest_result %}
+                            <tr>
+                                <td>
+                                    <strong>{{ website.name }}</strong>
+                                    <br>
+                                    <small class="text-muted">Added {{ website.created_at.strftime('%Y-%m-%d') }}</small>
+                                </td>
+                                <td>
+                                    <a href="{{ website.url }}" target="_blank" class="text-decoration-none">
+                                        {{ website.url[:40] }}{% if website.url|length > 40 %}...{% endif %}
+                                        <i data-feather="external-link" style="width: 0.8rem; height: 0.8rem;" class="ms-1"></i>
+                                    </a>
+                                </td>
+                                <td>
+                                    {% if latest %}
+                                        {% if latest.is_up %}
+                                            <span class="badge bg-success">
+                                                <i data-feather="check-circle" style="width: 1rem; height: 1rem;"></i>
+                                                Online
+                                            </span>
+                                            {% if latest.status_code %}
+                                                <br><small class="text-muted">{{ latest.status_code }}</small>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="badge bg-danger">
+                                                <i data-feather="x-circle" style="width: 1rem; height: 1rem;"></i>
+                                                Offline
+                                            </span>
+                                            {% if latest.error_message %}
+                                                <br><small class="text-muted" title="{{ latest.error_message }}">{{ latest.error_message[:20] }}{% if latest.error_message|length > 20 %}...{% endif %}</small>
+                                            {% endif %}
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="badge bg-secondary">
+                                            <i data-feather="clock" style="width: 1rem; height: 1rem;"></i>
+                                            Pending
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% set uptime = website.uptime_percentage %}
+                                    <div class="d-flex align-items-center">
+                                        <div class="progress me-2" style="width: 60px; height: 8px;">
+                                            <div class="progress-bar 
+                                                {% if uptime >= 99 %}bg-success
+                                                {% elif uptime >= 95 %}bg-warning
+                                                {% else %}bg-danger{% endif %}" 
+                                                style="width: {{ uptime }}%"></div>
+                                        </div>
+                                        <small>{{ uptime }}%</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if latest %}
+                                        <span title="{{ latest.checked_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}">
+                                            {{ latest.checked_at.strftime('%H:%M:%S') }}
+                                        </span>
+                                        {% if latest.response_time %}
+                                            <br><small class="text-muted">
+                                                {% if latest.response_time < 1 %}
+                                                    {{ (latest.response_time * 1000)|round|int }}ms
+                                                {% else %}
+                                                    {{ "%.2f"|format(latest.response_time) }}s
+                                                {% endif %}
+                                            </small>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-muted">Never</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if website.is_active %}
+                                        <span class="badge bg-success">Active</span>
+                                    {% else %}
+                                        <span class="badge bg-warning">Inactive</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <!-- Edit Button -->
+                                        <button type="button" class="btn btn-outline-primary btn-sm" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#editModal{{ website.id }}">
+                                            <i data-feather="edit" style="width: 1rem; height: 1rem;"></i>
+                                        </button>
+                                        
+                                        <!-- Toggle Active Button -->
+                                        <form action="{{ url_for('toggle_website', website_id=website.id) }}" method="POST" class="d-inline">
+                                            <button type="submit" class="btn btn-outline-warning btn-sm" 
+                                                    title="{% if website.is_active %}Deactivate{% else %}Activate{% endif %}">
+                                                {% if website.is_active %}
+                                                    <i data-feather="pause" style="width: 1rem; height: 1rem;"></i>
+                                                {% else %}
+                                                    <i data-feather="play" style="width: 1rem; height: 1rem;"></i>
+                                                {% endif %}
+                                            </button>
+                                        </form>
+                                        
+                                        <!-- Delete Button -->
+                                        <button type="button" class="btn btn-outline-danger btn-sm" 
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#deleteModal{{ website.id }}">
+                                            <i data-feather="trash-2" style="width: 1rem; height: 1rem;"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i data-feather="globe" style="width: 4rem; height: 4rem;" class="text-muted mb-3"></i>
+                    <h4 class="text-muted">No websites added yet</h4>
+                    <p class="text-muted">Add your first website using the form above or upload a weblist file.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Modals -->
+{% for website in websites %}
+<div class="modal fade" id="editModal{{ website.id }}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Website</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('edit_website', website_id=website.id) }}" method="POST">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="editName{{ website.id }}" class="form-label">Website Name</label>
+                        <input type="text" class="form-control" id="editName{{ website.id }}" 
+                               name="name" value="{{ website.name }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editUrl{{ website.id }}" class="form-label">URL</label>
+                        <input type="url" class="form-control" id="editUrl{{ website.id }}" 
+                               name="url" value="{{ website.url }}" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Modal -->
+<div class="modal fade" id="deleteModal{{ website.id }}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Delete Website</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete <strong>{{ website.name }}</strong>?</p>
+                <p class="text-muted">This will also delete all monitoring history for this website. This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form action="{{ url_for('delete_website', website_id=website.id) }}" method="POST" class="d-inline">
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% endblock %}
