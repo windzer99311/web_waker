@@ -4,30 +4,25 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-# The virtual time we want to simulate as the start
+# Fixed virtual start time
 virtual_start_str = "2025-06-13 00:00:00"
 virtual_start = datetime.strptime(virtual_start_str, "%Y-%m-%d %H:%M:%S")
-
-# Actual server boot time
 real_server_start = datetime.now()
 
-# Wake web loop (background thread)
+# Wake web function (one request per URL every 30s)
 def wake_web():
     while True:
         try:
             with open('weblist.txt', 'r') as f:
-                url = f.readline()
-                while url:
-                    url = url.strip()
-                    if url:
-                        try:
-                            response = requests.get(url)
-                            response.raise_for_status()
-                            print(f'Successfully visited your web: {url}')
-                            print(f'Status code: {response.status_code}')
-                        except requests.RequestException as e:
-                            print(f'Error detected as: {e}')
-                    url = f.readline()
+                urls = [line.strip() for line in f if line.strip()]
+                for url in urls:
+                    try:
+                        response = requests.get(url)
+                        response.raise_for_status()
+                        print(f'Successfully visited your web: {url}')
+                        print(f'Status code: {response.status_code}')
+                    except requests.RequestException as e:
+                        print(f'Error detected as: {e}')
         except FileNotFoundError:
             print("weblist.txt not found.")
         time.sleep(30)
@@ -37,7 +32,7 @@ def index():
     return render_template_string(f'''
         <html>
         <head>
-            <title>Wake Web Running</title>
+            <title>Wake Web</title>
             <script>
                 const virtualStart = new Date("{virtual_start_str}").getTime();
                 const serverStart = new Date("{real_server_start.strftime('%Y-%m-%dT%H:%M:%S')}").getTime();
@@ -71,5 +66,5 @@ def index():
         </html>
     ''')
 
-# Start background thread
+# Start background wake-up thread
 threading.Thread(target=wake_web, daemon=True).start()
