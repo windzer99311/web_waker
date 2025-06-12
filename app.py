@@ -1,28 +1,75 @@
-from flask import Flask
+from flask import Flask, render_template_string
 import threading, requests, time
+from datetime import datetime
 
 app = Flask(__name__)
 
+# The virtual time we want to simulate as the start
+virtual_start_str = "2025-06-13 00:00:00"
+virtual_start = datetime.strptime(virtual_start_str, "%Y-%m-%d %H:%M:%S")
+
+# Actual server boot time
+real_server_start = datetime.now()
+
+# Wake web loop (background thread)
 def wake_web():
     while True:
-        with open('weblist.txt', 'r') as f:
-            url = f.readline()
-            while url:
-                url = url.strip()
-                if url:
-                    try:
-                        response = requests.get(url)
-                        response.raise_for_status()
-                        print(f'Successfully visited your web: {url}')
-                        print(f'Status code: {response.status_code}')
-                    except requests.RequestException as e:
-                        print(f'Error detected as: {e}')
+        try:
+            with open('weblist.txt', 'r') as f:
                 url = f.readline()
+                while url:
+                    url = url.strip()
+                    if url:
+                        try:
+                            response = requests.get(url)
+                            response.raise_for_status()
+                            print(f'Successfully visited your web: {url}')
+                            print(f'Status code: {response.status_code}')
+                        except requests.RequestException as e:
+                            print(f'Error detected as: {e}')
+                    url = f.readline()
+        except FileNotFoundError:
+            print("weblist.txt not found.")
         time.sleep(30)
 
 @app.route('/')
 def index():
-    return "Wake web running..."
+    return render_template_string(f'''
+        <html>
+        <head>
+            <title>Wake Web Running</title>
+            <script>
+                const virtualStart = new Date("{virtual_start_str}").getTime();
+                const serverStart = new Date("{real_server_start.strftime('%Y-%m-%dT%H:%M:%S')}").getTime();
+                const pageOpened = new Date().getTime();
+                const offset = pageOpened - serverStart;
 
-# Start wake_web in a background thread as soon as the app launches
+                function updateTime() {{
+                    const now = new Date().getTime();
+                    const elapsed = now - pageOpened + offset;
+                    const displayTime = new Date(virtualStart + elapsed);
+
+                    const year = displayTime.getFullYear();
+                    const month = String(displayTime.getMonth() + 1).padStart(2, '0');
+                    const day = String(displayTime.getDate()).padStart(2, '0');
+                    const hour = String(displayTime.getHours()).padStart(2, '0');
+                    const min = String(displayTime.getMinutes()).padStart(2, '0');
+                    const sec = String(displayTime.getSeconds()).padStart(2, '0');
+
+                    document.getElementById("timer").innerText =
+                        `Time running since ${{year}}-${{month}}-${{day}} ${{hour}}:${{min}}:${{sec}}`;
+                }}
+
+                setInterval(updateTime, 1000);
+                window.onload = updateTime;
+            </script>
+        </head>
+        <body>
+            <h2>Wake web running...</h2>
+            <p id="timer">Time running since {virtual_start_str}</p>
+        </body>
+        </html>
+    ''')
+
+# Start background thread
 threading.Thread(target=wake_web, daemon=True).start()
