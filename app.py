@@ -1,19 +1,29 @@
-from flask import Flask, render_template_string, jsonify
-import threading, requests, time
-from datetime import datetime
+import streamlit as st
+import threading
+import requests
+import time
+from datetime import datetime, timedelta
+from streamlit_autorefresh import st_autorefresh
+import os
 
-app = Flask(__name__)
-
-# Virtual start time and server boot time
-virtual_start_str = "2025-06-13 00:00:00"
-virtual_start = datetime.strptime(virtual_start_str, "%Y-%m-%d %H:%M:%S")
-real_server_start = datetime.now()
-
-# Store log messages
+# Constants
+VIRTUAL_START_STR = "2025-06-13 00:00:00"
+VIRTUAL_START = datetime.strptime(VIRTUAL_START_STR, "%Y-%m-%d %H:%M:%S")
+BOOT_TIME_FILE = "boot_time.txt"
 logs = []
 
-# Wake web loop with logging
+# Load or create persistent server start time
+if os.path.exists(BOOT_TIME_FILE):
+    with open(BOOT_TIME_FILE, "r") as f:
+        REAL_SERVER_START = datetime.strptime(f.read().strip(), "%Y-%m-%d %H:%M:%S")
+else:
+    REAL_SERVER_START = datetime.now()
+    with open(BOOT_TIME_FILE, "w") as f:
+        f.write(REAL_SERVER_START.strftime("%Y-%m-%d %H:%M:%S"))
+
+# Wake web function with global log access
 def wake_web():
+    global logs
     while True:
         try:
             with open('weblist.txt', 'r') as f:
@@ -33,73 +43,30 @@ def wake_web():
                         print(err)
                         logs.append(err)
         except FileNotFoundError:
-            msg = "weblist.txt not found."
-            print(msg)
-            logs.append(msg)
+            logs.append("weblist.txt not found.")
 
-        # Limit log size
         if len(logs) > 100:
             del logs[:len(logs) - 100]
 
         time.sleep(30)
 
-@app.route('/')
-def index():
-    return render_template_string(f'''
-        <html>
-        <head>
-            <title>Wake Web</title>
-            <script>
-                const virtualStart = new Date("{virtual_start_str}").getTime();
-                const serverStart = new Date("{real_server_start.strftime('%Y-%m-%dT%H:%M:%S')}").getTime();
-                const pageOpened = new Date().getTime();
-                const offset = pageOpened - serverStart;
+# Ensure the thread starts only once
+if 'thread_started' not in st.session_state:
+    print("Starting background thread...")
+    threading.Thread(target=wake_web, daemon=True).start()
+    st.session_state.thread_started = True
 
-                function updateTime() {{
-                    const now = new Date().getTime();
-                    const elapsed = now - pageOpened + offset;
-                    const displayTime = new Date(virtualStart + elapsed);
+# Refresh UI every second
+st_autorefresh(interval=1000, key="timer_refresh")
 
-                    const year = displayTime.getFullYear();
-                    const month = String(displayTime.getMonth() + 1).padStart(2, '0');
-                    const day = String(displayTime.getDate()).padStart(2, '0');
-                    const hour = String(displayTime.getHours()).padStart(2, '0');
-                    const min = String(displayTime.getMinutes()).padStart(2, '0');
-                    const sec = String(displayTime.getSeconds()).padStart(2, '0');
+# Display virtual time
+elapsed_real = (datetime.now() - REAL_SERVER_START).total_seconds()
+current_virtual = VIRTUAL_START + timedelta(seconds=elapsed_real)
 
-                    document.getElementById("timer").innerText =
-                        `Time running since ${{year}}-${{month}}-${{day}} ${{hour}}:${{min}}:${{sec}}`;
-                }}
+st.title("Wake Web Streamlit")
+st.write("### Time running since:")
+st.code(current_virtual.strftime("%Y-%m-%d %H:%M:%S"))
 
-                function fetchLogs() {{
-                    fetch('/logs')
-                        .then(response => response.json())
-                        .then(data => {{
-                            document.getElementById("log").innerText = data.logs.join("\\n");
-                        }});
-                }}
-
-                setInterval(updateTime, 1000);
-                setInterval(fetchLogs, 5000);
-                window.onload = function() {{
-                    updateTime();
-                    fetchLogs();
-                }};
-            </script>
-        </head>
-        <body>
-            <h2>Wake web running...</h2>
-            <p id="timer">Time running since {virtual_start_str}</p>
-            <h3>Request Log</h3>
-            <pre id="log" style="background:#eee;padding:10px;border-radius:5px;height:300px;overflow:auto;"></pre>
-        </body>
-        </html>
-    ''')
-
-# Endpoint to fetch logs
-@app.route('/logs')
-def get_logs():
-    return jsonify(logs=logs[-100:])  # send only last 100 messages
-
-# Background thread
-threading.Thread(target=wake_web, daemon=True).start()
+# Show log
+st.write("### Request Log")
+st.code("\n".join(logs[-100:]))
