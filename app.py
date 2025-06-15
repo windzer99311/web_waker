@@ -73,7 +73,45 @@ if os.path.exists(LOG_FILE):
         lines = f.readlines()
         last_lines = lines[-100:]
         st.write("### Request Log")
-        st.code("".join(last_lines))
+        st.markdown(
+            f"""
+            <style>
+                .log-box::-webkit-scrollbar {{
+                    width: 10px;
+                }}
+                .log-box::-webkit-scrollbar-track {{
+                    background: #eee;
+                    border-radius: 5px;
+                }}
+                .log-box::-webkit-scrollbar-thumb {{
+                    background: #888;
+                    border-radius: 5px;
+                }}
+                .log-box::-webkit-scrollbar-thumb:hover {{
+                    background: #555;
+                }}
+                .log-box {{
+                    scrollbar-color: #888 #eee;
+                    scrollbar-width: thin;
+                }}
+            </style>
+            <div class="log-box" style="
+                background-color:#f9f9f9;
+                color:#000;
+                padding:10px;
+                border-radius:5px;
+                border:1px solid #ccc;
+                height:400px;
+                overflow:auto;
+                font-family: monospace;
+                white-space: pre-wrap;
+                width: 100%;">
+                {"<br>".join(line.strip() for line in last_lines)}
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
 else:
     st.write("### Request Log")
     st.info("No logs yet.")
